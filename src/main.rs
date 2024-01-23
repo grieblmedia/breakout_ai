@@ -91,6 +91,9 @@ struct Brick;
 #[derive(Resource)]
 struct CollisionSound(Handle<AudioSource>);
 
+#[derive(Component)]
+struct Name(String);
+
 // This bundle is a collection of the components that define a "wall" in our game
 #[derive(Bundle)]
 struct WallBundle {
@@ -201,6 +204,7 @@ fn setup(
         },
         Paddle,
         Collider,
+        Name("Paddle".to_string()),
     ));
 
     // Ball
@@ -346,6 +350,7 @@ fn check_for_collisions(
     mut scoreboard: ResMut<Scoreboard>,
     mut ball_query: Query<(&mut Velocity, &Transform), With<Ball>>,
     collider_query: Query<(Entity, &Transform, Option<&Brick>), With<Collider>>,
+    name_query: Query<&Name>,
     mut collision_events: EventWriter<CollisionEvent>,
 ) {
     let (mut ball_velocity, ball_transform) = ball_query.single_mut();
@@ -364,8 +369,10 @@ fn check_for_collisions(
             collision_events.send_default();
 
             // Bricks should be despawned and increment the scoreboard on collision
+            let mut brick_hit: bool = false;
             if maybe_brick.is_some() {
                 scoreboard.score += 1;
+                brick_hit = true;
                 commands.entity(collider_entity).despawn();
             }
 
@@ -378,7 +385,15 @@ fn check_for_collisions(
             match collision {
                 Collision::Left => reflect_x = ball_velocity.x > 0.0,
                 Collision::Right => reflect_x = ball_velocity.x < 0.0,
-                Collision::Top => reflect_y = ball_velocity.y < 0.0,
+                Collision::Top => {
+                    reflect_y = ball_velocity.y < 0.0;
+                    if !brick_hit
+                        && scoreboard.score > 0
+                        && get_entity_name(&name_query, collider_entity) != "Paddle"
+                    {
+                        scoreboard.score -= 1;
+                    }
+                }
                 Collision::Bottom => reflect_y = ball_velocity.y > 0.0,
                 Collision::Inside => { /* do nothing */ }
             }
@@ -388,7 +403,7 @@ fn check_for_collisions(
                 ball_velocity.x = -ball_velocity.x;
             }
 
-            // reflect velocity on the y-axis if we hit something on the y-axis
+            // reflect velocity on the y-axis if we hit something on the y-axis & reduce score on collision with bottom wall
             if reflect_y {
                 ball_velocity.y = -ball_velocity.y;
             }
@@ -410,5 +425,13 @@ fn play_collision_sound(
             // auto-despawn the entity when playback finishes
             settings: PlaybackSettings::DESPAWN,
         });
+    }
+}
+
+fn get_entity_name(query: &Query<&Name>, entity: Entity) -> String {
+    if let Ok(name) = query.get(entity) {
+        name.0.clone()
+    } else {
+        String::from("")
     }
 }
