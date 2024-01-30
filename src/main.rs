@@ -49,36 +49,12 @@ const TEXT_COLOR: Color = Color::rgb(0.5, 0.5, 1.0);
 const SCORE_COLOR: Color = Color::rgb(1.0, 0.5, 0.5);
 
 fn main() {
-    // Initialize a TensorFlow graph
-    let mut graph = tensorflow::Graph::new();
-
-    // Create session options
-    let options = tensorflow::SessionOptions::new();
-
-    // Create a new session with the graph
-    let session = tensorflow::Session::new(&options, &graph).unwrap();
-
-    // Define a simple constant operation
-    let mut a = graph.new_operation("Const", "Const").unwrap();
-    a.set_attr_tensor("value", tensorflow::Tensor::new(&[1]).with_values(&[3.0_f32]).unwrap())
-        .unwrap();
-    a.set_attr_type("dtype", tensorflow::DataType::Float)
-        .unwrap();
-    let a_operation = a.finish().unwrap();
-
-    // Run the session
-    let mut session_run_args = tensorflow::SessionRunArgs::new();
-    session_run_args.add_target(&a_operation);
-    session.run(&mut session_run_args).unwrap();
-
-    println!("TensorFlow operation executed successfully.");
-
     App::new()
         .add_plugins(DefaultPlugins)
         .insert_resource(Scoreboard { score: 0 })
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .add_event::<CollisionEvent>()
-        .add_systems(Startup, setup)
+        .add_systems(Startup, (setup, recognise_walls))
         // Add our gameplay simulation systems to the fixed timestep schedule
         // which runs at 64 Hz by default
         .add_systems(
@@ -88,6 +64,10 @@ fn main() {
                 move_paddle,
                 check_for_collisions,
                 play_collision_sound,
+                recognise_ball,
+                recognise_paddle,
+                recognise_bricks,
+                recognise_score,
             )
                 // `chain`ing systems together runs them in order
                 .chain(),
@@ -130,6 +110,7 @@ struct WallBundle {
 }
 
 /// Which side of the arena is this wall located on?
+#[derive(Debug)]
 enum WallLocation {
     Left,
     Right,
@@ -329,6 +310,35 @@ fn setup(
             ));
         }
     }
+}
+
+fn recognise_walls() {
+    println!("Left wall position: {:?}", Vec2::new(LEFT_WALL, 0.));
+    println!("Right wall position: {:?}", Vec2::new(RIGHT_WALL, 0.));
+    println!("Top wall position: {:?}", Vec2::new(0., TOP_WALL));
+    println!("Bottom wall position: {:?}", Vec2::new(0., BOTTOM_WALL));
+}
+
+fn recognise_ball(mut ball_query: Query<(&mut Velocity, &Transform), With<Ball>>) {
+    let (mut ball_velocity, ball_transform) = ball_query.single_mut();
+    println!("Ball position: {:?}", ball_transform.translation);
+    println!("Ball velocity x:{}, y:{}", ball_velocity.x, ball_velocity.y);
+}
+
+fn recognise_paddle(mut paddle_query: Query<&mut Transform, With<Paddle>>) {
+    let mut paddle_transform = paddle_query.single_mut();
+    println!("Paddle position: {:?}", paddle_transform.translation);
+}
+
+fn recognise_bricks(mut brick_query: Query<&mut Transform, With<Brick>>) {
+    for brick_transform in brick_query.iter() {
+        println!("Brick position: {:?}", brick_transform.translation);
+    }
+}
+
+fn recognise_score(scoreboard: Res<Scoreboard>) {
+    let score = scoreboard.score;
+    println!("Score: {}", score);
 }
 
 fn move_paddle(
