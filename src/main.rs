@@ -1,9 +1,11 @@
 //! A simplified implementation of the classic game "Breakout".
+
 use bevy::{
     prelude::*,
     sprite::collide_aabb::{collide, Collision},
     sprite::MaterialMesh2dBundle,
 };
+extern crate tensorflow;
 
 // These constants are defined in `Transform` units.
 // Using the default 2D camera they correspond 1:1 with screen pixels.
@@ -47,6 +49,30 @@ const TEXT_COLOR: Color = Color::rgb(0.5, 0.5, 1.0);
 const SCORE_COLOR: Color = Color::rgb(1.0, 0.5, 0.5);
 
 fn main() {
+    // Initialize a TensorFlow graph
+    let mut graph = tensorflow::Graph::new();
+
+    // Create session options
+    let options = tensorflow::SessionOptions::new();
+
+    // Create a new session with the graph
+    let session = tensorflow::Session::new(&options, &graph).unwrap();
+
+    // Define a simple constant operation
+    let mut a = graph.new_operation("Const", "Const").unwrap();
+    a.set_attr_tensor("value", tensorflow::Tensor::new(&[1]).with_values(&[3.0_f32]).unwrap())
+        .unwrap();
+    a.set_attr_type("dtype", tensorflow::DataType::Float)
+        .unwrap();
+    let a_operation = a.finish().unwrap();
+
+    // Run the session
+    let mut session_run_args = tensorflow::SessionRunArgs::new();
+    session_run_args.add_target(&a_operation);
+    session.run(&mut session_run_args).unwrap();
+
+    println!("TensorFlow operation executed successfully.");
+
     App::new()
         .add_plugins(DefaultPlugins)
         .insert_resource(Scoreboard { score: 0 })

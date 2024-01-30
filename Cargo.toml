@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 bevy = "*"
+tensorflow = "0.21.0"
