@@ -2,7 +2,8 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 
 // Diese Struktur repräsentiert die Umgebung, in der der RL-Agent interagiert.
-struct RlEnvironment {
+#[derive(Resource)]
+pub struct RlEnvironment {
     // Speichert den aktuellen Zustand der Umgebung
     state: GameState,
     // Speichert die Belohnungen für bestimmte Aktionen
@@ -20,12 +21,12 @@ struct GameState {
 
 impl RlEnvironment {
     // Initialisiert die RL-Umgebung mit dem Startzustand des Spiels
-    fn new() -> Self {
+    pub fn new() -> Self {
         RlEnvironment {
             state: GameState {
                 ball_position: Vec2::new(0.0, -50.0),
-                paddle_position: Vec2::new(0.0, GAP_BETWEEN_PADDLE_AND_FLOOR),
-                velocity: INITIAL_BALL_DIRECTION * BALL_SPEED,
+                paddle_position: Vec2::new(0.0, super::GAP_BETWEEN_PADDLE_AND_FLOOR),
+                velocity: super::INITIAL_BALL_DIRECTION * super::BALL_SPEED,
                 bricks_remaining: 0, // Dies sollte auf die anfängliche Anzahl der Ziegel gesetzt werden
             },
             rewards: HashMap::from([

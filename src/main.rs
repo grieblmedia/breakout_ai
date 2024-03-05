@@ -6,6 +6,9 @@ use bevy::{
     sprite::MaterialMesh2dBundle,
 };
 extern crate tensorflow;
+use rl_environment::RlEnvironment;
+
+mod rl_environment;
 
 // These constants are defined in `Transform` units.
 // Using the default 2D camera they correspond 1:1 with screen pixels.
@@ -55,6 +58,7 @@ fn main() {
         .insert_resource(Scoreboard { score: 0 })
         .insert_resource(Level { count: 0 })
         .insert_resource(ClearColor(BACKGROUND_COLOR))
+        .insert_resource(RlEnvironment::new())
         .add_event::<CollisionEvent>()
         .add_systems(Startup, (setup, recognise_walls))
         // Add our gameplay simulation systems to the fixed timestep schedule
