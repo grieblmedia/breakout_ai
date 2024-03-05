@@ -18,6 +18,7 @@ const PADDLE_PADDING: f32 = 10.0;
 // We set the z-value of the ball to 1 so it renders on top in the case of overlapping sprites.
 const BALL_STARTING_POSITION: Vec3 = Vec3::new(0.0, -50.0, 1.0);
 const BALL_SIZE: Vec3 = Vec3::new(30.0, 30.0, 0.0);
+//const BALL_SPEED: f32 = 400.0;
 const BALL_SPEED: f32 = 400.0;
 const INITIAL_BALL_DIRECTION: Vec2 = Vec2::new(0.5, -0.5);
 
@@ -52,6 +53,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .insert_resource(Scoreboard { score: 0 })
+        .insert_resource(Level { count: 0 })
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .add_event::<CollisionEvent>()
         .add_systems(Startup, (setup, recognise_walls))
@@ -72,7 +74,10 @@ fn main() {
                 // `chain`ing systems together runs them in order
                 .chain(),
         )
-        .add_systems(Update, (update_scoreboard, bevy::window::close_on_esc))
+        .add_systems(
+            Update,
+            (update_scoreboard, update_level, bevy::window::close_on_esc),
+        )
         .run();
 }
 
@@ -179,6 +184,12 @@ struct Scoreboard {
     score: usize,
 }
 
+// This resource tracks the game's levels / replays
+#[derive(Resource)]
+struct Level {
+    count: usize,
+}
+
 // Add the game's entities to our world
 fn setup(
     mut commands: Commands,
@@ -257,6 +268,11 @@ fn setup(
     commands.spawn(WallBundle::new(WallLocation::Bottom));
     commands.spawn(WallBundle::new(WallLocation::Top));
 
+    // Bricks
+    spawn_bricks(commands, paddle_y);
+}
+
+fn spawn_bricks(mut commands: Commands<'_, '_>, paddle_y: f32) {
     // Bricks
     let total_width_of_bricks = (RIGHT_WALL - LEFT_WALL) - 2. * GAP_BETWEEN_BRICKS_AND_SIDES;
     let bottom_edge_of_bricks = paddle_y + GAP_BETWEEN_PADDLE_AND_BRICKS;
@@ -379,6 +395,29 @@ fn apply_velocity(mut query: Query<(&mut Transform, &Velocity)>, time: Res<Time>
 fn update_scoreboard(scoreboard: Res<Scoreboard>, mut query: Query<&mut Text>) {
     let mut text = query.single_mut();
     text.sections[1].value = scoreboard.score.to_string();
+}
+
+fn update_level(
+    mut level: ResMut<Level>,
+    mut scoreboard: ResMut<Scoreboard>,
+    mut brick_query: Query<With<Brick>>,
+    mut ball_query: Query<(&mut Transform), With<Ball>>,
+    mut commands: Commands<'_, '_>,
+) {
+    if brick_query.is_empty() {
+        level.count += 1;
+        scoreboard.score = 0;
+
+        // Rest Ball Position
+        for mut transform in &mut ball_query {
+            transform.translation.x = BALL_STARTING_POSITION.x;
+            transform.translation.y = BALL_STARTING_POSITION.y;
+        }
+
+        // Paddle
+        let paddle_y = BOTTOM_WALL + GAP_BETWEEN_PADDLE_AND_FLOOR;
+        spawn_bricks(commands, paddle_y);
+    }
 }
 
 fn check_for_collisions(
