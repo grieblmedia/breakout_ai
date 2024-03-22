@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
+use crate::{BOTTOM_WALL, BRICK_SIZE, GAP_BETWEEN_BRICKS, GAP_BETWEEN_BRICKS_AND_CEILING, GAP_BETWEEN_BRICKS_AND_SIDES, GAP_BETWEEN_PADDLE_AND_BRICKS, GAP_BETWEEN_PADDLE_AND_FLOOR, LEFT_WALL, RIGHT_WALL, TOP_WALL};
+
 // Diese Struktur repräsentiert die Umgebung, in der der RL-Agent interagiert.
 #[derive(Resource)]
 pub struct RlEnvironment {
@@ -22,16 +24,23 @@ struct GameState {
 impl RlEnvironment {
     // Initialisiert die RL-Umgebung mit dem Startzustand des Spiels
     pub fn new() -> Self {
+        let paddle_y = BOTTOM_WALL + GAP_BETWEEN_PADDLE_AND_FLOOR;
+        let total_width_of_bricks = (RIGHT_WALL - LEFT_WALL) - 2. * GAP_BETWEEN_BRICKS_AND_SIDES;
+        let bottom_edge_of_bricks = paddle_y + GAP_BETWEEN_PADDLE_AND_BRICKS;
+        let total_height_of_bricks = TOP_WALL - bottom_edge_of_bricks - GAP_BETWEEN_BRICKS_AND_CEILING;
+        let n_columns = (total_width_of_bricks / (BRICK_SIZE.x + GAP_BETWEEN_BRICKS)).floor() as usize;
+        let n_rows = (total_height_of_bricks / (BRICK_SIZE.y + GAP_BETWEEN_BRICKS)).floor() as usize;
+
         RlEnvironment {
             state: GameState {
                 ball_position: Vec2::new(0.0, -50.0),
                 paddle_position: Vec2::new(0.0, super::GAP_BETWEEN_PADDLE_AND_FLOOR),
                 velocity: super::INITIAL_BALL_DIRECTION * super::BALL_SPEED,
-                bricks_remaining: 0, // Dies sollte auf die anfängliche Anzahl der Ziegel gesetzt werden
+                bricks_remaining: n_columns * n_rows, // Dies sollte auf die anfängliche Anzahl der Ziegel gesetzt werden
             },
             rewards: HashMap::from([
                 ("brick_hit".to_string(), 1.0),
-                ("ball_lost".to_string(), -1.0),
+                ("bottom_wall".to_string(), -1.0),
                 ("game_won".to_string(), 10.0),
                 ("game_lost".to_string(), -10.0),
             ]),
@@ -39,7 +48,7 @@ impl RlEnvironment {
     }
 
     // Aktualisiert den Zustand der Umgebung basierend auf dem Spielgeschehen
-    fn update_state(&mut self, event: &GameEvent) {
+    pub fn update_state(&mut self, event: &GameEvent) {
         match event {
             GameEvent::BallPosition(x, y) => {
                 self.state.ball_position = Vec2::new(*x, *y);
@@ -51,17 +60,21 @@ impl RlEnvironment {
                 self.state.velocity = Vec2::new(*x, *y);
             }
             GameEvent::BrickDestroyed => {
-                self.state.bricks_remaining -= 1;
+                if self.state.bricks_remaining > 0 {
+                    self.state.bricks_remaining -= 1;
+                } else {
+                    self.state.bricks_remaining = 0;
+                }
             }
             _ => {}
         }
     }
 
     // Berechnet die Belohnung für das gegebene Ereignis
-    fn calculate_reward(&self, event: &GameEvent) -> f32 {
+    pub fn calculate_reward(&self, event: &GameEvent) -> f32 {
         match event {
             GameEvent::BrickDestroyed => *self.rewards.get("brick_hit").unwrap(),
-            GameEvent::BallLost => *self.rewards.get("ball_lost").unwrap(),
+            GameEvent::Bottomwall => *self.rewards.get("bottom_wall").unwrap(),
             GameEvent::GameWon => *self.rewards.get("game_won").unwrap(),
             GameEvent::GameLost => *self.rewards.get("game_lost").unwrap(),
             _ => 0.0,
@@ -70,12 +83,12 @@ impl RlEnvironment {
 }
 
 // Definiert verschiedene Arten von Ereignissen, die während des Spiels auftreten können
-enum GameEvent {
+pub enum GameEvent {
     BallPosition(f32, f32),
     PaddlePosition(f32),
     Velocity(f32, f32),
     BrickDestroyed,
-    BallLost,
+    Bottomwall,
     GameWon,
     GameLost,
 }

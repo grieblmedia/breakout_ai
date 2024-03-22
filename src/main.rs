@@ -6,7 +6,7 @@ use bevy::{
     sprite::MaterialMesh2dBundle,
 };
 extern crate tensorflow;
-use rl_environment::RlEnvironment;
+use rl_environment::{GameEvent, RlEnvironment};
 
 mod rl_environment;
 
@@ -339,20 +339,38 @@ fn recognise_walls() {
     println!("Bottom wall position: {:?}", Vec2::new(0., BOTTOM_WALL));
 }
 
-fn recognise_ball(mut ball_query: Query<(&mut Velocity, &Transform), With<Ball>>) {
+fn recognise_ball(
+    mut ball_query: Query<(&mut Velocity, &Transform), With<Ball>>,
+    mut rl_env: ResMut<RlEnvironment>,
+) {
     let (mut ball_velocity, ball_transform) = ball_query.single_mut();
-    println!("Ball position: {:?}", ball_transform.translation);
-    println!("Ball velocity x:{}, y:{}", ball_velocity.x, ball_velocity.y);
+    //println!("Ball position: {:?}", ball_transform.translation);
+    //println!("Ball velocity x:{}, y:{}", ball_velocity.x, ball_velocity.y);
+
+    // Let the ai know it
+    let event = GameEvent::BallPosition(ball_transform.translation.x, ball_transform.translation.y);
+    rl_env.update_state(&event);
+
+    // Let the ai know it
+    let event = GameEvent::Velocity(ball_velocity.x, ball_velocity.y);
+    rl_env.update_state(&event);
 }
 
-fn recognise_paddle(mut paddle_query: Query<&mut Transform, With<Paddle>>) {
+fn recognise_paddle(
+    mut paddle_query: Query<&mut Transform, With<Paddle>>,
+    mut rl_env: ResMut<RlEnvironment>,
+) {
     let mut paddle_transform = paddle_query.single_mut();
-    println!("Paddle position: {:?}", paddle_transform.translation);
+    //println!("Paddle position: {:?}", paddle_transform.translation);
+
+    // Let the ai know it
+    let event = GameEvent::PaddlePosition(paddle_transform.translation.x);
+    rl_env.update_state(&event);
 }
 
 fn recognise_bricks(mut brick_query: Query<&mut Transform, With<Brick>>) {
     for brick_transform in brick_query.iter() {
-        println!("Brick position: {:?}", brick_transform.translation);
+        // println!("Brick position: {:?}", brick_transform.translation);
     }
 }
 
@@ -407,6 +425,7 @@ fn update_level(
     mut brick_query: Query<With<Brick>>,
     mut ball_query: Query<(&mut Transform), With<Ball>>,
     mut commands: Commands<'_, '_>,
+    mut rl_env: ResMut<RlEnvironment>,
 ) {
     if brick_query.is_empty() {
         level.count += 1;
@@ -421,6 +440,12 @@ fn update_level(
         // Paddle
         let paddle_y = BOTTOM_WALL + GAP_BETWEEN_PADDLE_AND_FLOOR;
         spawn_bricks(commands, paddle_y);
+
+        // Let the ai know it
+        let event = GameEvent::GameWon;
+        rl_env.update_state(&event);
+        let reward = rl_env.calculate_reward(&event);
+        println!("Reward for event: {}", reward);
     }
 }
 
@@ -431,6 +456,7 @@ fn check_for_collisions(
     collider_query: Query<(Entity, &Transform, Option<&Brick>), With<Collider>>,
     name_query: Query<&Name>,
     mut collision_events: EventWriter<CollisionEvent>,
+    mut rl_env: ResMut<RlEnvironment>,
 ) {
     let (mut ball_velocity, ball_transform) = ball_query.single_mut();
     let ball_size = ball_transform.scale.truncate();
@@ -471,6 +497,20 @@ fn check_for_collisions(
                         && get_entity_name(&name_query, collider_entity) != "Paddle"
                     {
                         scoreboard.score -= 1;
+
+                        // Let the ai know it
+                        let event = GameEvent::Bottomwall;
+                        rl_env.update_state(&event);
+                        let reward = rl_env.calculate_reward(&event);
+                        println!("Reward for event: {}", reward);
+
+                        if scoreboard.score == 0 {
+                            // Let the ai know it
+                            let event = GameEvent::GameLost;
+                            rl_env.update_state(&event);
+                            let reward = rl_env.calculate_reward(&event);
+                            println!("Reward for event: {}", reward);
+                        }
                     }
                 }
                 Collision::Bottom => reflect_y = ball_velocity.y > 0.0,
@@ -485,6 +525,14 @@ fn check_for_collisions(
             // reflect velocity on the y-axis if we hit something on the y-axis & reduce score on collision with bottom wall
             if reflect_y {
                 ball_velocity.y = -ball_velocity.y;
+            }
+
+            // Let the ai know it
+            if brick_hit {
+                let event = GameEvent::BrickDestroyed;
+                rl_env.update_state(&event);
+                let reward = rl_env.calculate_reward(&event);
+                println!("Reward for event: {}", reward);
             }
         }
     }
