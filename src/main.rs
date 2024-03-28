@@ -7,11 +7,13 @@ use bevy::{
 };
 extern crate tensorflow as tf;
 
-use model::{ai_controller, TensorFlowModel};
-use rl_environment::{GameEvent, RlEnvironment};
+use game_action::GameAction;
+use game_state::GameState;
+use log_state::log_state;
 
-mod model;
-mod rl_environment;
+mod game_action;
+mod game_state;
+mod log_state;
 
 // These constants are defined in `Transform` units.
 // Using the default 2D camera they correspond 1:1 with screen pixels.
@@ -61,10 +63,9 @@ fn main() {
         .insert_resource(Scoreboard { score: 0 })
         .insert_resource(Level { count: 0 })
         .insert_resource(ClearColor(BACKGROUND_COLOR))
-        .insert_resource(RlEnvironment::new())
-        .insert_resource(TensorFlowModel)
+        .insert_resource(GameState::new())
         .add_event::<CollisionEvent>()
-        .add_systems(Startup, (setup, recognise_walls))
+        .add_systems(Startup, setup)
         // Add our gameplay simulation systems to the fixed timestep schedule
         // which runs at 64 Hz by default
         .add_systems(
@@ -72,13 +73,8 @@ fn main() {
             (
                 apply_velocity,
                 move_paddle,
-                ai_controller,
                 check_for_collisions,
-                play_collision_sound,
-                recognise_ball,
-                recognise_paddle,
-                recognise_bricks,
-                recognise_score,
+                play_collision_sound
             )
                 // `chain`ing systems together runs them in order
                 .chain(),
@@ -337,40 +333,48 @@ fn spawn_bricks(mut commands: Commands<'_, '_>, paddle_y: f32) {
     }
 }
 
+/*
+fn log_state(
+    mut ball_query: Query<&Transform, With<Ball>>,
+    mut paddle_query: Query<&mut Transform, With<Paddle>>,
+) {
+    let game_state = GameState {
+        ball_position: recognise_ball(ball_query),
+        paddle_position: recognise_paddle(paddle_query),
+        velocity: recognise_velocity(ball_query),
+        action: GameAction::MoveRight,
+        reward: 1.0, // Beispielwert
+    };
+
+    log_state(&game_state);
+}
+*/
+
+/*
 fn recognise_walls() {
     println!("Left wall position: {:?}", Vec2::new(LEFT_WALL, 0.));
     println!("Right wall position: {:?}", Vec2::new(RIGHT_WALL, 0.));
     println!("Top wall position: {:?}", Vec2::new(0., TOP_WALL));
     println!("Bottom wall position: {:?}", Vec2::new(0., BOTTOM_WALL));
 }
+*/
 
-fn recognise_ball(
-    mut ball_query: Query<(&mut Velocity, &Transform), With<Ball>>,
-    mut rl_env: ResMut<RlEnvironment>,
-) {
-    let (mut ball_velocity, ball_transform) = ball_query.single_mut();
-    //println!("Ball position: {:?}", ball_transform.translation);
-    //println!("Ball velocity x:{}, y:{}", ball_velocity.x, ball_velocity.y);
-
-    // Let the ai know it
-    let event = GameEvent::BallPosition(ball_transform.translation.x, ball_transform.translation.y);
-    rl_env.update_state(&event);
-
-    // Let the ai know it
-    let event = GameEvent::Velocity(ball_velocity.x, ball_velocity.y);
-    rl_env.update_state(&event);
+fn recognise_ball(mut ball_query: Query<&Transform, With<Ball>>) -> Vec2 {
+    let ball_transform = ball_query.single_mut();
+    return Vec2::new(ball_transform.translation.x, ball_transform.translation.y);
 }
 
-fn recognise_paddle(
-    mut paddle_query: Query<&mut Transform, With<Paddle>>,
-    mut rl_env: ResMut<RlEnvironment>,
-) {
-    let mut paddle_transform = paddle_query.single_mut();
-    //println!("Paddle position: {:?}", paddle_transform.translation);
+fn recognise_velocity(mut ball_query: Query<&Velocity, With<Ball>>) -> Vec2 {
+    let ball_velocity = ball_query.single_mut();
+    return Vec2::new(ball_velocity.x, ball_velocity.y);
+}
 
-    // Let the ai know it
-    let event = GameEvent::PaddlePosition(paddle_transform.translation.x);
-    rl_env.update_state(&event);
+fn recognise_paddle(mut paddle_query: Query<&mut Transform, With<Paddle>>) -> Vec2 {
+    let mut paddle_transform = paddle_query.single_mut();
+    return Vec2::new(
+        paddle_transform.translation.x,
+        paddle_transform.translation.y,
+    );
 }
 
 fn recognise_bricks(mut brick_query: Query<&mut Transform, With<Brick>>) {
@@ -388,12 +392,15 @@ fn move_paddle(
     keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<&mut Transform, With<Paddle>>,
     time: Res<Time>,
+    scoreboard: Res<Scoreboard>,
+    mut gstate: ResMut<GameState>,
 ) {
     let mut paddle_transform = query.single_mut();
     let mut direction = 0.0;
 
     if keyboard_input.pressed(KeyCode::Left) {
         direction -= 1.0;
+        gstate.set_action(GameAction::MoveLeft);
     }
 
     if keyboard_input.pressed(KeyCode::Right) {
@@ -430,7 +437,6 @@ fn update_level(
     mut brick_query: Query<With<Brick>>,
     mut ball_query: Query<(&mut Transform), With<Ball>>,
     mut commands: Commands<'_, '_>,
-    mut rl_env: ResMut<RlEnvironment>,
 ) {
     if brick_query.is_empty() {
         level.count += 1;
@@ -445,12 +451,6 @@ fn update_level(
         // Paddle
         let paddle_y = BOTTOM_WALL + GAP_BETWEEN_PADDLE_AND_FLOOR;
         spawn_bricks(commands, paddle_y);
-
-        // Let the ai know it
-        let event = GameEvent::GameWon;
-        rl_env.update_state(&event);
-        let reward = rl_env.calculate_reward(&event);
-        println!("Reward for event: {}", reward);
     }
 }
 
@@ -461,7 +461,6 @@ fn check_for_collisions(
     collider_query: Query<(Entity, &Transform, Option<&Brick>), With<Collider>>,
     name_query: Query<&Name>,
     mut collision_events: EventWriter<CollisionEvent>,
-    mut rl_env: ResMut<RlEnvironment>,
 ) {
     let (mut ball_velocity, ball_transform) = ball_query.single_mut();
     let ball_size = ball_transform.scale.truncate();

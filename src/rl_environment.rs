@@ -19,7 +19,7 @@ pub struct RlEnvironment {
 
 // Repräsentiert den Spielzustand, den der RL-Agent beobachtet
 #[derive(Clone)]
-struct GameState {
+pub struct GameState {
     ball_position: Vec2,
     paddle_position: Vec2,
     velocity: Vec2,

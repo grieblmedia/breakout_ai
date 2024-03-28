@@ -1,5 +1,6 @@
 use rand::Rng; // Fügen Sie rand zur Cargo.toml für Zufallszahlengenerierung hinzu
-use tensorflow as tf; // Dies setzt voraus, dass Sie ein passendes TensorFlow-Modell haben
+use tensorflow as tf;
+// Dies setzt voraus, dass Sie ein passendes TensorFlow-Modell haben
 
 // Angenommen, Sie haben ein einfaches neuronales Netzwerk-Modell in TensorFlow erstellt
 // und möchten dieses für die Entscheidungsfindung verwenden.
@@ -62,7 +63,7 @@ enum GameAction {
     // Weitere Aktionen hier definieren...
 }
 
-// Integrieren Sie die Entscheidungsfindung des Modells in Ihr Spiel
+/* Integrieren Sie die Entscheidungsfindung des Modells in Ihr Spiel
 pub fn ai_controller(
     model: Res<TensorFlowModel>,
     state: Res<GameState>,
@@ -79,6 +80,7 @@ pub fn ai_controller(
         }
     }
 }
+*/
 
 /* Fügen Sie `ai_controller` Ihrem Bevy AppBuilder hinzu
 fn main() {
