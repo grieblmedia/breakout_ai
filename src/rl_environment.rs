@@ -1,13 +1,18 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
-use crate::{BOTTOM_WALL, BRICK_SIZE, GAP_BETWEEN_BRICKS, GAP_BETWEEN_BRICKS_AND_CEILING, GAP_BETWEEN_BRICKS_AND_SIDES, GAP_BETWEEN_PADDLE_AND_BRICKS, GAP_BETWEEN_PADDLE_AND_FLOOR, LEFT_WALL, RIGHT_WALL, TOP_WALL};
+use crate::{
+    BOTTOM_WALL, BRICK_SIZE, GAP_BETWEEN_BRICKS, GAP_BETWEEN_BRICKS_AND_CEILING,
+    GAP_BETWEEN_BRICKS_AND_SIDES, GAP_BETWEEN_PADDLE_AND_BRICKS, GAP_BETWEEN_PADDLE_AND_FLOOR,
+    LEFT_WALL, RIGHT_WALL, TOP_WALL,
+};
 
 // Diese Struktur repräsentiert die Umgebung, in der der RL-Agent interagiert.
 #[derive(Resource)]
 pub struct RlEnvironment {
     // Speichert den aktuellen Zustand der Umgebung
     state: GameState,
+
     // Speichert die Belohnungen für bestimmte Aktionen
     rewards: HashMap<String, f32>,
 }
@@ -27,9 +32,12 @@ impl RlEnvironment {
         let paddle_y = BOTTOM_WALL + GAP_BETWEEN_PADDLE_AND_FLOOR;
         let total_width_of_bricks = (RIGHT_WALL - LEFT_WALL) - 2. * GAP_BETWEEN_BRICKS_AND_SIDES;
         let bottom_edge_of_bricks = paddle_y + GAP_BETWEEN_PADDLE_AND_BRICKS;
-        let total_height_of_bricks = TOP_WALL - bottom_edge_of_bricks - GAP_BETWEEN_BRICKS_AND_CEILING;
-        let n_columns = (total_width_of_bricks / (BRICK_SIZE.x + GAP_BETWEEN_BRICKS)).floor() as usize;
-        let n_rows = (total_height_of_bricks / (BRICK_SIZE.y + GAP_BETWEEN_BRICKS)).floor() as usize;
+        let total_height_of_bricks =
+            TOP_WALL - bottom_edge_of_bricks - GAP_BETWEEN_BRICKS_AND_CEILING;
+        let n_columns =
+            (total_width_of_bricks / (BRICK_SIZE.x + GAP_BETWEEN_BRICKS)).floor() as usize;
+        let n_rows =
+            (total_height_of_bricks / (BRICK_SIZE.y + GAP_BETWEEN_BRICKS)).floor() as usize;
 
         RlEnvironment {
             state: GameState {
@@ -93,7 +101,7 @@ pub enum GameEvent {
     GameLost,
 }
 
-// Beispiel für die Verwendung der RlEnvironment in einer Systemfunktion
+/*Beispiel für die Verwendung der RlEnvironment in einer Systemfunktion
 fn game_event_listener(
     mut rl_env: ResMut<RlEnvironment>,
     // Fügen Sie Parameter hier hinzu, um Spielereignisse zu empfangen
@@ -106,3 +114,4 @@ fn game_event_listener(
 
     // Hier würden Sie die Belohnung und den aktualisierten Zustand an Ihr RL-Modell senden
 }
+*/

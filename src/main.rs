@@ -5,9 +5,12 @@ use bevy::{
     sprite::collide_aabb::{collide, Collision},
     sprite::MaterialMesh2dBundle,
 };
-extern crate tensorflow;
+extern crate tensorflow as tf;
+
+use model::{ai_controller, TensorFlowModel};
 use rl_environment::{GameEvent, RlEnvironment};
 
+mod model;
 mod rl_environment;
 
 // These constants are defined in `Transform` units.
@@ -59,6 +62,7 @@ fn main() {
         .insert_resource(Level { count: 0 })
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .insert_resource(RlEnvironment::new())
+        .insert_resource(TensorFlowModel)
         .add_event::<CollisionEvent>()
         .add_systems(Startup, (setup, recognise_walls))
         // Add our gameplay simulation systems to the fixed timestep schedule
@@ -68,6 +72,7 @@ fn main() {
             (
                 apply_velocity,
                 move_paddle,
+                ai_controller,
                 check_for_collisions,
                 play_collision_sound,
                 recognise_ball,
