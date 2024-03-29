@@ -1,6 +1,9 @@
 use std::fs::OpenOptions;
 use std::io::Write;
 
+use crate::game_action::GameAction;
+use crate::game_state::GameState;
+
 
 /// Fügt einen Spielzustand zur Datensammlung hinzu.
 pub fn log_state(game_state: &GameState) {
@@ -21,10 +24,10 @@ pub fn log_state(game_state: &GameState) {
 
     // Erstellt eine Zeichenkette, die den Spielzustand repräsentiert
     let line = format!(
-        "{},{},{},{},{},{}\n",
+        "{},{},{},{},{},{},{}",
         game_state.ball_position.x, game_state.ball_position.y,
         game_state.paddle_position.x, game_state.velocity.x, game_state.velocity.y,
-        action
+        action, game_state.reward
     );
 
     // Schreibt die Zeichenkette in die Datei

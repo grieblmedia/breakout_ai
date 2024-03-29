@@ -8,10 +8,12 @@ use bevy::{
 extern crate tensorflow as tf;
 
 use game_action::GameAction;
+use game_event::GameEvent;
 use game_state::GameState;
 use log_state::log_state;
 
 mod game_action;
+mod game_event;
 mod game_state;
 mod log_state;
 
@@ -74,7 +76,8 @@ fn main() {
                 apply_velocity,
                 move_paddle,
                 check_for_collisions,
-                play_collision_sound
+                play_collision_sound,
+                write_game_state,
             )
                 // `chain`ing systems together runs them in order
                 .chain(),
@@ -388,6 +391,10 @@ fn recognise_score(scoreboard: Res<Scoreboard>) {
     println!("Score: {}", score);
 }
 
+fn write_game_state(mut gstate: ResMut<GameState>) {
+    log_state(&gstate);
+}
+
 fn move_paddle(
     keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<&mut Transform, With<Paddle>>,
@@ -405,6 +412,7 @@ fn move_paddle(
 
     if keyboard_input.pressed(KeyCode::Right) {
         direction += 1.0;
+        gstate.set_action(GameAction::MoveRight);
     }
 
     // Calculate the new horizontal paddle position based on player input
@@ -417,12 +425,22 @@ fn move_paddle(
     let right_bound = RIGHT_WALL - WALL_THICKNESS / 2.0 - PADDLE_SIZE.x / 2.0 - PADDLE_PADDING;
 
     paddle_transform.translation.x = new_paddle_position.clamp(left_bound, right_bound);
+    gstate.set_paddle_position(Vec2::new(
+        paddle_transform.translation.x,
+        paddle_transform.translation.y,
+    ));
 }
 
-fn apply_velocity(mut query: Query<(&mut Transform, &Velocity)>, time: Res<Time>) {
+fn apply_velocity(
+    mut query: Query<(&mut Transform, &Velocity)>,
+    time: Res<Time>,
+    mut gstate: ResMut<GameState>,
+) {
     for (mut transform, velocity) in &mut query {
         transform.translation.x += velocity.x * time.delta_seconds();
         transform.translation.y += velocity.y * time.delta_seconds();
+        gstate.set_velocity(Vec2::new(velocity.x, velocity.y));
+        gstate.set_ball_position(Vec2::new(transform.translation.x, transform.translation.y));
     }
 }
 
@@ -437,10 +455,12 @@ fn update_level(
     mut brick_query: Query<With<Brick>>,
     mut ball_query: Query<(&mut Transform), With<Ball>>,
     mut commands: Commands<'_, '_>,
+    mut gstate: ResMut<GameState>,
 ) {
     if brick_query.is_empty() {
         level.count += 1;
         scoreboard.score = 0;
+        gstate.set_reward(GameEvent::GameWon);
 
         // Rest Ball Position
         for mut transform in &mut ball_query {
@@ -461,6 +481,7 @@ fn check_for_collisions(
     collider_query: Query<(Entity, &Transform, Option<&Brick>), With<Collider>>,
     name_query: Query<&Name>,
     mut collision_events: EventWriter<CollisionEvent>,
+    mut gstate: ResMut<GameState>,
 ) {
     let (mut ball_velocity, ball_transform) = ball_query.single_mut();
     let ball_size = ball_transform.scale.truncate();
@@ -483,6 +504,7 @@ fn check_for_collisions(
                 scoreboard.score += 1;
                 brick_hit = true;
                 commands.entity(collider_entity).despawn();
+                gstate.set_reward(GameEvent::BrickDestroyed);
             }
 
             // reflect the ball when it collides
@@ -501,19 +523,10 @@ fn check_for_collisions(
                         && get_entity_name(&name_query, collider_entity) != "Paddle"
                     {
                         scoreboard.score -= 1;
-
-                        // Let the ai know it
-                        let event = GameEvent::Bottomwall;
-                        rl_env.update_state(&event);
-                        let reward = rl_env.calculate_reward(&event);
-                        println!("Reward for event: {}", reward);
+                        gstate.set_reward(GameEvent::Bottomwall);
 
                         if scoreboard.score == 0 {
-                            // Let the ai know it
-                            let event = GameEvent::GameLost;
-                            rl_env.update_state(&event);
-                            let reward = rl_env.calculate_reward(&event);
-                            println!("Reward for event: {}", reward);
+                            gstate.set_reward(GameEvent::GameLost);
                         }
                     }
                 }
@@ -529,14 +542,6 @@ fn check_for_collisions(
             // reflect velocity on the y-axis if we hit something on the y-axis & reduce score on collision with bottom wall
             if reflect_y {
                 ball_velocity.y = -ball_velocity.y;
-            }
-
-            // Let the ai know it
-            if brick_hit {
-                let event = GameEvent::BrickDestroyed;
-                rl_env.update_state(&event);
-                let reward = rl_env.calculate_reward(&event);
-                println!("Reward for event: {}", reward);
             }
         }
     }

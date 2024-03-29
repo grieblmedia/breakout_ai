@@ -1,6 +1,8 @@
-use bevy::math::Vec2;
+use bevy::{ecs::system::Resource, math::Vec2};
+use std::collections::HashMap;
 
 use crate::game_action::GameAction;
+use crate::game_event::GameEvent;
 
 /// Struktur, die einen Spielzustand darstellt.
 #[derive(Clone, Resource)]
@@ -41,8 +43,15 @@ impl GameState {
         self.action = action;
     }
 
-    pub fn set_reward(&mut self, reward: f32) {
-        self.reward = reward;
+    pub fn set_reward(&mut self, event: GameEvent) {
+        // TODO: Could be improved
+        self.reward += match event {
+            GameEvent::BrickDestroyed => 1.0,
+            GameEvent::Bottomwall => -1.0,
+            GameEvent::GameWon => 10.0,
+            GameEvent::GameLost => -10.0,
+            _ => 0.0,
+        };
     }
 
     // Getter für den gesamten GameState
